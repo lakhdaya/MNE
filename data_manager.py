@@ -1,67 +1,61 @@
+import torch
+from torch.utils.data import Dataset
+import matplotlib.pyplot as plt
+import mne
 import os
-import shutil
-import random
+import numpy as np
+from mne.preprocessing import ICA
+from utils import create_montage
 
-SUBJECTS_PATH = "subjects"
+mne.set_log_level('WARNING')  # or 'ERROR' to reduce output further
 
-def clean_data_dir(dest_dir):
-    """Supprime tous les fichiers et sous-dossiers dans le dossier data s'il existe déjà."""
-    if os.path.exists(dest_dir):
-        for root, dirs, files in os.walk(dest_dir, topdown=False):
-            for name in files:
-                os.remove(os.path.join(root, name))
-            for name in dirs:
-                shutil.rmtree(os.path.join(root, name))
+def get_bad_channels(raw):
+    data = raw.get_data()
+    variances = np.var(data, axis=1)
+    threshold = np.mean(variances) + 3 * np.std(variances)
+    bad_idx = np.where(variances > threshold)[0]
+    return [raw.ch_names[i] for i in bad_idx]
 
-def get_subjects(source_dir):
-    """Returns a list of all subject folder paths inside the source_dir."""
-    return [os.path.join(source_dir, d) for d in os.listdir(source_dir)
-            if os.path.isdir(os.path.join(source_dir, d))]
+def load_subject(file_path):
+    raw = mne.io.read_raw_edf(file_path, preload=True)   
+    raw.resample(128)
+    create_montage(raw)
+    raw.filter(1., 40.)
+    raw.set_eeg_reference('average')
+    bad_channels =  get_bad_channels(raw)
+    raw.info['bads'] = bad_channels
+    raw.interpolate_bads()
+    # ica = ICA(n_components=20, random_state=97)
+    # ica.fit(raw)
+    # Basic preprocessing, adjust as needed
+    picks = mne.pick_types(raw.info, eeg=True, exclude='bads')
+    events, event_id = mne.events_from_annotations(raw)
+    epochs = mne.Epochs(raw, events, event_id=event_id, 
+                        tmin=-0.2, tmax=0.8, preload=True)
+    data = epochs.get_data()  # shape: (n_epochs, n_channels, n_times)
+    labels = epochs.events[:, 2]
+    return data, labels
 
-def split_subjects(subject_paths, train_ratio=0.7, val_ratio=0.15):
-    random.shuffle(subject_paths)
-    total = len(subject_paths)
-    train_end = int(train_ratio * total)
-    val_end = train_end + int(val_ratio * total)
+def load_dataset(folder_path):
+    X_list, y_list = [], []
+    for f in os.listdir(folder_path):
+        if f.endswith('.edf'):
+            edf_path = os.path.join(folder_path, f)
+            X, y = load_subject(edf_path)
+            X_list.append(X)
+            y_list.append(y)
 
-    return {
-        'train': subject_paths[:train_end],
-        'val': subject_paths[train_end:val_end],
-        'test': subject_paths[val_end:]
-    }
+    return np.concatenate(X_list), np.concatenate(y_list)
 
+# -------- Dataset --------
+class EEGDataset(Dataset):
+    def __init__(self, X, y):
+        self.X = torch.tensor(X, dtype=torch.float32)  # (N, C, T)
+        self.X = self.X.permute(0, 2, 1)  # (N, T, C) for LSTM
+        self.y = torch.tensor(y, dtype=torch.long)
 
-def create_split_dirs(dest_dir):
-    for split in ['train', 'val', 'test']:
-        os.makedirs(os.path.join(dest_dir, split), exist_ok=True)
+    def __len__(self):
+        return len(self.y)
 
-def split_subjects(subject_paths, train_ratio=0.7, val_ratio=0.15):
-    random.shuffle(subject_paths)
-    total = len(subject_paths)
-    train_end = int(train_ratio * total)
-    val_end = train_end + int(val_ratio * total)
-
-    return {
-        'train': subject_paths[:train_end],
-        'val': subject_paths[train_end:val_end],
-        'test': subject_paths[val_end:]
-    }
-
-
-
-def copy_subject_files(splits, dest_dir):
-    for split_name, subject_paths in splits.items():
-        for subject_path in subject_paths:
-            for file in os.listdir(subject_path):
-                if file.endswith('.edf') or file.endswith('.edf.event'):
-                    src = os.path.join(subject_path, file)
-                    dst = os.path.join(dest_dir, split_name, f"{os.path.basename(subject_path)}_{file}")
-                    shutil.copy(src, dst)
-
-def organize_dataset_by_subject(source_dir='subjects', dest_dir='data'):
-    clean_data_dir(dest_dir)
-    create_split_dirs(dest_dir)
-    subjects = get_subjects(source_dir)
-    splits = split_subjects(subjects)
-    copy_subject_files(splits, dest_dir)
-    print("Subjects organized into train, val, and test sets.")
+    def __getitem__(self, idx):
+        return self.X[idx], self.y[idx]
