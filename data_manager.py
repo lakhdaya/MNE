@@ -39,6 +39,7 @@ class EEGDataset(Dataset):
         - reject_criteria: Dictionary of rejection criteria (e.g. {'eeg': 150e-6})
         """
         self.path_edf = path_edf # path to all the edf files
+        self.nb_files = len(os.listdir(self.path_edf)) // 2
         self.l_freq = l_freq
         self.h_freq = h_freq
         self.bad_channels = bad_channels or []
@@ -48,26 +49,27 @@ class EEGDataset(Dataset):
         self.tmax = tmax
         self.raw = self.load_raw() # load raws
         self.event, self.event_id = mne.events_from_annotations(self.raw) # get annotations from .event, this file is needed
-        self.events = mne.find_events(self.raw) # regroup per event
         self.epochs = self.make_epochs()
     def load_raw(self) -> mne.io.BaseRaw:
         """
         Load raw files from the path
         """
+        print("preprocessing raws from the folder")
         raws = [preprocessing_raw(
             mne.io.read_raw_edf(file.path, preload=True),
             self.montage,
             self.l_freq,
             self.h_freq,
             self.bad_channels,
-            ) for file in tqdm(os.scandir(self.path_edf)) if "event" not in file.name]
+            ) for file in tqdm(os.scandir(self.path_edf), total=self.nb_files) if "event" not in file.name]
+        print("done")
         return mne.concatenate_raws(raws)
 
     def make_epochs(self) -> mne.Epochs:
         return mne.Epochs(
             self.raw,
-            self.events,
-            self.events_id,
+            self.event,
+            self.event_id,
             tmin=self.tmin,
             tmax=self.tmax,
             baseline=(None, 0),
@@ -93,4 +95,6 @@ if __name__ == "__main__":
     Used to test if the dataloader works properly
     """
 
-    data = EEGDataset(path_edf="data/train", montage="standard_1005", bad_channels=["Fp1", "Fp2"]) 
+    data = EEGDataset(path_edf="data/val", montage="standard_1005", bad_channels=["Fp1", "Fp2"]) 
+    X, Y = next(iter(data))
+    print(X.shape, Y.shape)
