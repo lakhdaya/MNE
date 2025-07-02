@@ -5,6 +5,7 @@ from model import EEG_LSTM
 import torch.nn as nn
 import numpy as np
 from train import train, evaluate
+
 def main():
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
     print(f'Using device: {device}')
