@@ -1,3 +1,8 @@
+"""
+Main component, add argparse later
+MAIN TODO NOT functional right now
+"""
+
 import torch
 from data_manager import EEGDataset, load_dataset
 from torch.utils.data import Dataset, DataLoader

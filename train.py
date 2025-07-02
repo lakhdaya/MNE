@@ -1,3 +1,9 @@
+"""
+Train fucntion
+TODO
+
+"""
+
 import torch
 
 def train(model, dataloader, criterion, optimizer, device):

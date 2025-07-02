@@ -1,3 +1,7 @@
+"""
+EZvery small function utilize in files
+"""
+
 import mne
 import numpy as np
 
