@@ -50,6 +50,36 @@ class EEGDataset(Dataset):
         self.raw = self.load_raw() # load raws
         self.event, self.event_id = mne.events_from_annotations(self.raw) # get annotations from .event, this file is needed
         self.epochs = self.make_epochs()
+
+    @classmethod
+    def load(cls, raw_path: str, epochs_path: str):
+        """
+        Load raw and epochs from disk and create an EEGDataset instance.
+
+        Parameters:
+        - raw_path: path to saved raw file (e.g. 'raw.fif')
+        - epochs_path: path to saved epochs file (e.g. 'epochs-epo.fif')
+
+        Returns:
+        - EEGDataset instance with loaded raw and epochs
+        """
+        raw = mne.io.read_raw_fif(raw_path, preload=True)
+        epochs = mne.read_epochs(epochs_path, preload=True)
+
+        obj = cls.__new__(cls)  # create instance without calling __init__
+        obj.raw = raw
+        obj.epochs = epochs
+        obj.path_edf = None
+        obj.l_freq = None
+        obj.h_freq = None
+        obj.bad_channels = None
+        obj.reject_criteria = None
+        obj.tmin = epochs.tmin
+        obj.tmax = epochs.tmax
+        obj.event, obj.event_id = mne.events_from_annotations(raw)
+        obj.events = epochs.events
+        return obj
+
     def load_raw(self) -> mne.io.BaseRaw:
         """
         Load raw files from the path
@@ -81,20 +111,38 @@ class EEGDataset(Dataset):
         return len(self.epochs)
 
     def __getitem__(self, idx: int) -> Tuple[torch.Tensor, torch.Tensor]:
-        data: np.ndarray = self.epochs.get_data()[idx]  # shape: (n_channels, n_times)
-        label: int = self.epochs.events[idx, 2]
-
+        data = self.epochs.get_data()[idx]  # shape: (n_channels, n_times)
+        label = self.epochs.events[idx, 2]
+        label-=1 # to go from 0 to 2 instead of 1 to 3
         data_tensor = torch.tensor(data, dtype=torch.float32)
         label_tensor = torch.tensor(label, dtype=torch.long)
 
         return data_tensor, label_tensor
 
+    def save(self, raw_path: str, epochs_path: str):
+        """
+        Save the raw and epochs objects to disk.
+
+        Parameters:
+        - raw_path: file path to save the raw data (e.g. 'raw.fif')
+        - epochs_path: file path to save the epochs data (e.g. 'epochs-epo.fif')
+        """
+        self.raw.save(raw_path, overwrite=True)
+        self.epochs.save(epochs_path, overwrite=True)
+
 
 if __name__ == "__main__":
     """
-    Used to test if the dataloader works properly
+    Used to test if the dataloader works properly. In advanced, I should use testunit
     """
 
-    data = EEGDataset(path_edf="data/val", montage="standard_1005", bad_channels=["Fp1", "Fp2"]) 
+    data = EEGDataset(path_edf="subjects/S001", montage="standard_1005", bad_channels=["Fp1", "Fp2"])     
     X, Y = next(iter(data))
-    print(X.shape, Y.shape)
+    print(X.shape, Y.shape, Y) # should be a tensor, a shpae empty and a number
+    print(data.epochs.events.shape)  # Should be (n_epochs, 3)
+    print(data.epochs.events[:5])    # Preview first 5 event rows
+
+    data.save("raw.fif", "event.fif")
+    data = EEGDataset.load("raw.fif", "event.fif")
+    X1, Y1 = next(iter(data))
+    print(X.shape, Y1)
