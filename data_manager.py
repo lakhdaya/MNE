@@ -9,15 +9,17 @@ import mne
 import os
 import numpy as np
 from mne.preprocessing import ICA
-from utils import create_montage
 from typing import Optional, Dict, List, Tuple
 from preprocessing import preprocessing_raw
+import mne
+from tqdm import tqdm
 
+mne.set_log_level('WARNING')
 class EEGDataset(Dataset):
     def __init__(
         self,
-        edf_path: str,
-        event_id: Dict[str, int],
+        path_edf: str,
+        montage: str,
         tmin: float = -0.2,
         tmax: float = 0.8,
         l_freq: float = 1.0,
@@ -29,29 +31,36 @@ class EEGDataset(Dataset):
         EEG dataset for PyTorch based on MNE Epochs.
 
         Parameters:
-        - edf_path: Path of the edf files
-        - event_id: Dictionary mapping event labels to integers
+        - path_edf: Path of the edf files
+        - montage: Montage name
         - tmin, tmax: Epoch time window (in seconds)
         - l_freq, h_freq: Bandpass filter frequencies
         - bad_channels: List of channel names to mark as bad
         - reject_criteria: Dictionary of rejection criteria (e.g. {'eeg': 150e-6})
         """
-        self.edf_path = edf_path
+        self.path_edf = path_edf # path to all the edf files
         self.l_freq = l_freq
         self.h_freq = h_freq
         self.bad_channels = bad_channels or []
+        self.montage = mne.channels.make_standard_montage(montage)
         self.reject_criteria = reject_criteria
-        
-        self.raw = self.load_raw()
-        self.event, self.event_id = mne.events_from_annotations(self.raw)
-        self.events = mne.find_events(self.raw)
+        self.tmin = tmin
+        self.tmax = tmax
+        self.raw = self.load_raw() # load raws
+        self.event, self.event_id = mne.events_from_annotations(self.raw) # get annotations from .event, this file is needed
+        self.events = mne.find_events(self.raw) # regroup per event
         self.epochs = self.make_epochs()
-
     def load_raw(self) -> mne.io.BaseRaw:
         """
         Load raw files from the path
         """
-        raws = [preprocessing_raw(mne.io.read_raw_edf(file.path)) for file in os.scandir(self.path) if "event" not in file.name]
+        raws = [preprocessing_raw(
+            mne.io.read_raw_edf(file.path, preload=True),
+            self.montage,
+            self.l_freq,
+            self.h_freq,
+            self.bad_channels,
+            ) for file in tqdm(os.scandir(self.path_edf)) if "event" not in file.name]
         return mne.concatenate_raws(raws)
 
     def make_epochs(self) -> mne.Epochs:
@@ -84,4 +93,4 @@ if __name__ == "__main__":
     Used to test if the dataloader works properly
     """
 
-    print("hello world")
+    data = EEGDataset(path_edf="data/train", montage="standard_1005", bad_channels=["Fp1", "Fp2"]) 
