@@ -5,6 +5,7 @@ TODO
 """
 
 import torch
+from tqdm import tqdm
 
 def train_one_epoch(model, dataloader, criterion, optimizer, device):
     """
@@ -13,7 +14,7 @@ def train_one_epoch(model, dataloader, criterion, optimizer, device):
     model.train()
     total_loss = 0
     correct = 0
-    for X_batch, y_batch in dataloader:
+    for X_batch, y_batch in tqdm(dataloader, total=len(dataloader.dataset)/8):
         X_batch, y_batch = X_batch.to(device), y_batch.to(device) # gpu or cpu
         optimizer.zero_grad() #remove preivous gradient
         outputs = model(X_batch)
@@ -34,7 +35,7 @@ def evaluate(model, dataloader, criterion, device):
     total_loss = 0
     correct = 0
     with torch.no_grad():
-        for X_batch, y_batch in dataloader:
+        for X_batch, y_batch in tqdm(dataloader):
             X_batch, y_batch = X_batch.to(device), y_batch.to(device)
             outputs = model(X_batch)
             loss = criterion(outputs, y_batch)
