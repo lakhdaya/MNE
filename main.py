@@ -21,8 +21,8 @@ def main():
     valid_dataset = EEGDataset("data/val", "standard_1005")
 
     #load loader
-    train_loader = DataLoader(train_dataset, batch_size=8, shuffle=True)
-    valid_loader = DataLoader(valid_dataset, batch_size=8, shuffle=False)
+    train_loader = DataLoader(train_dataset, batch_size=512, shuffle=True, num_workers=0)
+    valid_loader = DataLoader(valid_dataset, batch_size=512, shuffle=False, num_workers=0)
 
     sample, _ = train_dataset[0]
     n_channels = sample.shape[1]
