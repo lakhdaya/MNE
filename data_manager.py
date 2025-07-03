@@ -77,7 +77,6 @@ class EEGDataset(Dataset):
         obj.tmin = epochs.tmin
         obj.tmax = epochs.tmax
         obj.event, obj.event_id = mne.events_from_annotations(raw)
-        obj.events = epochs.events
         return obj
 
     def load_raw(self) -> mne.io.BaseRaw:
@@ -96,6 +95,9 @@ class EEGDataset(Dataset):
         return mne.concatenate_raws(raws)
 
     def make_epochs(self) -> mne.Epochs:
+        """
+        Create epochs from raw using event taken from .event files
+        """
         return mne.Epochs(
             self.raw,
             self.event,
@@ -108,6 +110,9 @@ class EEGDataset(Dataset):
         )
 
     def __len__(self) -> int:
+        """
+        Our time series has a lenght depending of the number of epoch. 
+        """
         return len(self.epochs)
 
     def __getitem__(self, idx: int) -> Tuple[torch.Tensor, torch.Tensor]:
@@ -122,7 +127,9 @@ class EEGDataset(Dataset):
     def save(self, raw_path: str, epochs_path: str):
         """
         Save the raw and epochs objects to disk.
-
+        It is recommended to use it beforehand and load
+        it with the ufnction load because instanciation
+        can take a lot of times due to the arguemnt preload=True.
         Parameters:
         - raw_path: file path to save the raw data (e.g. 'raw.fif')
         - epochs_path: file path to save the epochs data (e.g. 'epochs-epo.fif')
@@ -136,13 +143,17 @@ if __name__ == "__main__":
     Used to test if the dataloader works properly. In advanced, I should use testunit
     """
 
+    # Test creation
     data = EEGDataset(path_edf="subjects/S001", montage="standard_1005", bad_channels=["Fp1", "Fp2"])     
+    
+    # check format of X and Y
     X, Y = next(iter(data))
     print(X.shape, Y.shape, Y) # should be a tensor, a shpae empty and a number
     print(data.epochs.events.shape)  # Should be (n_epochs, 3)
     print(data.epochs.events[:5])    # Preview first 5 event rows
 
-    data.save("raw.fif", "event.fif")
+    # Test saving state
+    data.save("raw.fif", "event.fif") # save in fif
     data = EEGDataset.load("raw.fif", "event.fif")
     X1, Y1 = next(iter(data))
     print(X.shape, Y1)
