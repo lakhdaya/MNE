@@ -16,6 +16,8 @@ def train_one_epoch(model, dataloader, criterion, optimizer, device):
     correct = 0
     for X_batch, y_batch in tqdm(dataloader, total=len(dataloader.dataset)//dataloader.batch_size):
         X_batch, y_batch = X_batch.to(device), y_batch.to(device) # gpu or cpu
+        print(X_batch.device)
+        print(next(model.parameters()).device)
         optimizer.zero_grad() #remove preivous gradient
         outputs = model(X_batch)
         loss = criterion(outputs, y_batch)
@@ -34,6 +36,8 @@ def evaluate(model, dataloader, criterion, device):
     model.eval() # put the model in eval
     total_loss = 0
     correct = 0
+    if device.type == 'cuda':
+        torch.cuda.synchronize() #synchronize before starting
     with torch.no_grad(): # best way to evaluate withtout affecting gradients 
         for X_batch, y_batch in tqdm(dataloader):
             X_batch, y_batch = X_batch.to(device), y_batch.to(device)

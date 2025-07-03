@@ -21,8 +21,8 @@ def main():
     valid_dataset = EEGDataset("data/val", "standard_1005") #
 
     #load loader, in windows, we can't use multiple workers and GPU
-    train_loader = DataLoader(train_dataset, batch_size=512, shuffle=True, num_workers=0) # dataset is small memory so we can use big batch_size
-    valid_loader = DataLoader(valid_dataset, batch_size=512, shuffle=False, num_workers=0)
+    train_loader = DataLoader(train_dataset, batch_size=128, shuffle=True, num_workers=0) # dataset is small memory so we can use big batch_size
+    valid_loader = DataLoader(valid_dataset, batch_size=128, shuffle=False, num_workers=0)
 
     sample, _ = train_dataset[0]
     n_channels = sample.shape[1] # get number of entry channel, usually 64 for our case
@@ -30,6 +30,7 @@ def main():
 
     #actual training is just a test not the optimized one
     model = EEG_LSTM(input_size=n_channels, hidden_size=128, num_layers=2, num_classes=num_classes).to(device)
+    print(next(model.parameters()).device)
 
     criterion = nn.CrossEntropyLoss() # default loss to test, to refined after
     optimizer = torch.optim.Adam(model.parameters(), lr=1e-3)# default optimized, to refined 
