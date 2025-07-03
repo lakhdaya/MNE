@@ -16,23 +16,23 @@ def main():
     epochs = 5
 
     print("Preprocessing data")
-    #load data
-    train_dataset = EEGDataset("data/val","standard_1005")
-    valid_dataset = EEGDataset("data/val", "standard_1005")
+    #load data, using standard_1005 such as precized in the link
+    train_dataset = EEGDataset("data/val","standard_1005") # using val for now because fucntions too slow
+    valid_dataset = EEGDataset("data/val", "standard_1005") #
 
-    #load loader
-    train_loader = DataLoader(train_dataset, batch_size=512, shuffle=True, num_workers=0)
+    #load loader, in windows, we can't use multiple workers and GPU
+    train_loader = DataLoader(train_dataset, batch_size=512, shuffle=True, num_workers=0) # dataset is small memory so we can use big batch_size
     valid_loader = DataLoader(valid_dataset, batch_size=512, shuffle=False, num_workers=0)
 
     sample, _ = train_dataset[0]
-    n_channels = sample.shape[1]
+    n_channels = sample.shape[1] # get number of entry channel, usually 64 for our case
     num_classes = 3 #fixed for T0, T1 and T2
 
     #actual training is just a test not the optimized one
     model = EEG_LSTM(input_size=n_channels, hidden_size=128, num_layers=2, num_classes=num_classes).to(device)
 
-    criterion = nn.CrossEntropyLoss()
-    optimizer = torch.optim.Adam(model.parameters(), lr=1e-3)
+    criterion = nn.CrossEntropyLoss() # default loss to test, to refined after
+    optimizer = torch.optim.Adam(model.parameters(), lr=1e-3)# default optimized, to refined 
     print("Traning phase")
     print(f'Using device: {device}')
     train_epochs(
