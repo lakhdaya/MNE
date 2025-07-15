@@ -13,12 +13,12 @@ from train import train_epochs
 
 def main():
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-    epochs = 5
+    epochs = 30
 
     print("Preprocessing data")
     #load data, using standard_1005 such as precized in the link
-    train_dataset = EEGDataset("data/val","standard_1005") # using val for now because fucntions too slow
-    valid_dataset = EEGDataset("data/val", "standard_1005") #
+    train_dataset = EEGDataset("subjects/S001","standard_1005") # using val for now because fucntions too slow
+    valid_dataset = EEGDataset("subjects/S002", "standard_1005") #
 
     #load loader, in windows, we can't use multiple workers and GPU
     train_loader = DataLoader(train_dataset, batch_size=128, shuffle=True, num_workers=0) # dataset is small memory so we can use big batch_size
@@ -33,7 +33,7 @@ def main():
     print(next(model.parameters()).device)
 
     criterion = nn.CrossEntropyLoss() # default loss to test, to refined after
-    optimizer = torch.optim.Adam(model.parameters(), lr=1e-3)# default optimized, to refined 
+    optimizer = torch.optim.Adam(model.parameters(), lr=1e-2)# default optimized, to refined 
     print("Traning phase")
     print(f'Using device: {device}')
     train_epochs(
